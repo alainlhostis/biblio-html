@@ -1,0 +1,58 @@
+# À déposer dans le dépôt GitHub sous : .github/workflows/biblio.yml
+# La page est regénérée et publiée sur GitHub Pages à chaque mise à jour
+# du fichier .bib (poussé par le script de synchronisation Zotero) et à
+# chaque modification du générateur.
+
+name: Bibliographie HTML
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/*.bib"
+      - "gen_biblio_html.py"
+      - ".github/workflows/biblio.yml"
+  workflow_dispatch: {}      # permet aussi un lancement manuel
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installation des dépendances
+        run: pip install "bibtexparser==1.4.1" pylatexenc
+
+      - name: Génération de la page
+        run: |
+          python gen_biblio_html.py Publications_ALH_BetterBibLaTex.bib \
+            -o _site/index.html \
+            --titre "Publications d'Alain L'Hostis" \
+            --start-year 2023 --end-year 2026
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
