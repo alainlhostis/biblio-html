@@ -19,6 +19,7 @@ Utilisation :
 
 import argparse
 import html
+import os
 import re
 import sys
 from datetime import date
@@ -42,18 +43,18 @@ LIEN_DOI = "https://doi.org/"
 
 CATEGORIES = [
     # (code affiche, ancre html, titre de section)
-    ("ACL",   "articles",       "Articles in peer review journals"),
+    ("ACL",   "articles",       "Articles dans des revues à comité de lecture"),
     ("PP",    "preprints",      "Preprints"),
-    ("ACLN",  "articles-nopr",  "Articles without peer review"),
-    ("OS",    "chapitres",      "Chapters"),
-    ("COM",   "communications", "Communications with acts"),
-    ("INV",   "invitations",    "Conferences and seminars, invited"),
-    ("PRE",   "presentations",  "Presentations"),
-    ("RR",    "rapports",       "Research reports"),
-    ("BP",    "blog",           "Scientific blogposts"),
-    ("TH",    "theses",         "Thesis and HDR"),
-    ("ENC",   "encadrements",   "Thesis and memoirs, supervised"),
-    ("AUT",   "autres",         "Other productions"),
+    ("ACLN",  "articles-nopr",  "Articles sans comité de lecture"),
+    ("OS",    "chapitres",      "Chapitres d’ouvrages"),
+    ("COM",   "communications", "Communications avec actes"),
+    ("INV",   "invitations",    "Conférences et séminaires sur invitation"),
+    ("PRE",   "presentations",  "Présentations"),
+    ("RR",    "rapports",       "Rapports de recherche"),
+    ("BP",    "blog",           "Billets de blog scientifique"),
+    ("TH",    "theses",         "Thèses et HDR"),
+    ("ENC",   "encadrements",   "Thèses et mémoires encadrés"),
+    ("AUT",   "autres",         "Autres productions"),
 ]
 
 MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
@@ -450,7 +451,7 @@ def main():
     p = argparse.ArgumentParser(description="Bibliographie .bib -> page HTML")
     p.add_argument("bib", help="fichier .bib exporté par Better BibLaTeX")
     p.add_argument("-o", "--output", default="index.html", help="fichier HTML de sortie")
-    p.add_argument("--titre", default="Publications Alain L'Hostis", help="titre de la page")
+    p.add_argument("--titre", default="Publications", help="titre de la page")
     p.add_argument("--start-year", type=int, default=None,
                    help="(obsolète, ignoré)")
     p.add_argument("--end-year", type=int, default=None,
@@ -461,6 +462,9 @@ def main():
     entrees = [e for e in toutes if e.get("author") or e.get("editor")]
 
     page = construire_page(entrees, args.titre)
+    dossier = os.path.dirname(args.output)
+    if dossier:
+        os.makedirs(dossier, exist_ok=True)   # ex. _site/ n'existe pas sur GitHub
     with open(args.output, "w", encoding="utf-8") as f:
         f.write(page)
     print("OK : %d notices -> %s" % (len(entrees), args.output))
