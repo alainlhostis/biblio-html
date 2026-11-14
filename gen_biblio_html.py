@@ -43,18 +43,18 @@ LIEN_DOI = "https://doi.org/"
 
 CATEGORIES = [
     # (code affiche, ancre html, titre de section)
-    ("ACL",   "articles",       "Articles dans des revues à comité de lecture"),
+    ("ACL",   "articles",       "Articles in peer review journals"),
     ("PP",    "preprints",      "Preprints"),
-    ("ACLN",  "articles-nopr",  "Articles sans comité de lecture"),
-    ("OS",    "chapitres",      "Chapitres d’ouvrages"),
-    ("COM",   "communications", "Communications avec actes"),
-    ("INV",   "invitations",    "Conférences et séminaires sur invitation"),
-    ("PRE",   "presentations",  "Présentations"),
-    ("RR",    "rapports",       "Rapports de recherche"),
-    ("BP",    "blog",           "Billets de blog scientifique"),
-    ("TH",    "theses",         "Thèses et HDR"),
-    ("ENC",   "encadrements",   "Thèses et mémoires encadrés"),
-    ("AUT",   "autres",         "Autres productions"),
+    ("ACLN",  "articles-nopr",  "Articles without peer review"),
+    ("OS",    "chapitres",      "Chapters"),
+    ("COM",   "communications", "Communications with acts"),
+    ("INV",   "invitations",    "Conferences and seminars, invited"),
+    ("PRE",   "presentations",  "Presentations"),
+    ("RR",    "rapports",       "Research reports"),
+    ("BP",    "blog",           "Scientific blogposts"),
+    ("TH",    "theses",         "Thesis and HDR"),
+    ("ENC",   "encadrements",   "Thesis and memoirs, supervised"),
+    ("AUT",   "autres",         "Other productions"),
 ]
 
 MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
