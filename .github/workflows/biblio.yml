@@ -40,8 +40,7 @@ jobs:
         run: |
           python gen_biblio_html.py Publications_ALH_BetterBibLaTex.bib \
             -o _site/index.html \
-            --titre "Publications of Alain L'Hostis" \
-            --start-year 1993 --end-year 2027
+            --titre "Publications of Alain L'Hostis"
 
       - uses: actions/upload-pages-artifact@v3
         with:

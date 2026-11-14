@@ -9,13 +9,12 @@ Reproduit la logique de bibliographie.tex du projet Overleaf :
   * nom du chercheur mis en evidence (classe CSS "me")
   * liens HAL / Zenodo (champ Zotero "extra" : tex.annotation: HAL: hal-xxxx)
     et DOI, sous forme de badges cliquables
-  * options --start-year / --end-year : publications hors periode grisees,
-    comme le grayout du preambule LaTeX
+  * affichage anti-chronologique (le plus recent en premier), la numerotation
+    restant celle de l'ordre chronologique croissant (ACL1 = la plus ancienne)
 
 Utilisation :
     pip install "bibtexparser==1.4.1" pylatexenc
     python gen_biblio_html.py Publications_ALH_BetterBibLaTex.bib -o index.html
-    python gen_biblio_html.py mon.bib -o index.html --start-year 2023 --end-year 2026
 """
 
 import argparse
@@ -43,18 +42,18 @@ LIEN_DOI = "https://doi.org/"
 
 CATEGORIES = [
     # (code affiche, ancre html, titre de section)
-    ("TH",    "theses",         "Thèses et HDR"),
-    ("ACL",   "articles",       "Articles dans des revues à comité de lecture"),
+    ("ACL",   "articles",       "Articles in peer review journals"),
     ("PP",    "preprints",      "Preprints"),
-    ("ACLN",  "articles-nopr",  "Articles sans comité de lecture"),
-    ("OS",    "chapitres",      "Chapitres d’ouvrages"),
-    ("COM",   "communications", "Communications avec actes"),
-    ("INV",   "invitations",    "Conférences et séminaires sur invitation"),
-    ("PRE",   "presentations",  "Présentations"),
-    ("RR",    "rapports",       "Rapports de recherche"),
-    ("BP",    "blog",           "Billets de blog scientifique"),
-    ("ENC",   "encadrements",   "Thèses et mémoires encadrés"),
-    ("AUT",   "autres",         "Autres productions"),
+    ("ACLN",  "articles-nopr",  "Articles without peer review"),
+    ("OS",    "chapitres",      "Chapters"),
+    ("COM",   "communications", "Communications with acts"),
+    ("INV",   "invitations",    "Conferences and seminars, invited"),
+    ("PRE",   "presentations",  "Presentations"),
+    ("RR",    "rapports",       "Research reports"),
+    ("BP",    "blog",           "Scientific blogposts"),
+    ("TH",    "theses",         "Thesis and HDR"),
+    ("ENC",   "encadrements",   "Thesis and memoirs, supervised"),
+    ("AUT",   "autres",         "Other productions"),
 ]
 
 MOIS_FR = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
@@ -154,8 +153,24 @@ def mots_cles(e):
 
 
 def classifier(e):
-    """Meme logique que les \\printbibliography de bibliographie.tex."""
-    t = e["ENTRY_TYPE"].lower()
+    """Même logique que les \\printbibliography de bibliographie.tex."""
+    # Récupérer le type d'entrée (en minuscules)
+    t = (e.get("ENTRYTYPE", "") or "").lower()
+
+    # Si le type est vide, essayer de le deviner à partir de l'ID ou d'autres champs
+    if not t:
+        # Essayez de deviner le type à partir du préfixe de l'ID (ex: @report{...} -> "report")
+        entry_id = e.get("ID", "")
+        if entry_id.startswith("report:"):
+            t = "report"
+        elif entry_id.startswith("thesis:"):
+            t = "thesis"
+        elif entry_id.startswith("online:"):
+            t = "online"
+        else:
+            # Si rien ne correspond, utilisez "misc" comme type par défaut
+            t = "misc"
+
     kw = mots_cles(e)
     if t == "thesis":
         return "ENC" if "enc" in kw else "TH"
@@ -173,7 +188,7 @@ def classifier(e):
         return "RR"
     if t == "online":
         return "BP"
-    return "AUT"   # book, inbook, misc, artwork... : section "Autres"
+    return "AUT"  # book, inbook, misc, artwork... : section "Autres"
 
 
 RE_HAL_ANN = re.compile(r"hal\s*:\s*([a-z][a-z0-9]*[-_][0-9a-z\-_]+)", re.I)
@@ -238,7 +253,7 @@ def references_auteurs(e):
 
 def venue(e):
     """Description bibliographique selon le type de notice."""
-    t = e["ENTRY_TYPE"].lower()
+    t = e["ENTRYTYPE"].lower()
     g = lambda f: latex_vers_unicode(e.get(f, "") or "")
     if t == "article":
         bits = []
@@ -329,17 +344,15 @@ em.journal { font-style: italic; }
 .hal { background: #fff1e5; color: #b45309; border: 1px solid #fdba74; }
 .zenodo { background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; }
 .doi { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
-.hors-periode { opacity: 0.45; }
 footer { margin-top: 3rem; color: #9ca3af; font-size: 0.78rem; }
 """
 
 
-def notice_html(code, numero, e, hors_periode):
+def notice_html(code, numero, e):
     auteurs = references_auteurs(e)
     annee = annee_notice(e)
     titre = latex_vers_unicode(e.get("title", ""))
     v = venue(e)
-    classe = "hors-periode" if hors_periode else ""
     badges = "".join(
         '<a class="badge %s" href="%s" target="_blank">%s</a>'
         % (lab.lower(), html.escape(url, quote=True), lab)
@@ -348,11 +361,11 @@ def notice_html(code, numero, e, hors_periode):
     ref = "%s. %d. <em>%s</em>." % (auteurs, annee, html.escape(titre))
     if v:
         ref += " " + v + "."
-    return ('<li class="%s"><span class="code">%s%d</span>%s%s</li>'
-            % (classe, code, numero, ref, badges))
+    return ('<li><span class="code">%s%d</span>%s%s</li>'
+            % (code, numero, ref, badges))
 
 
-def construire_page(entrees, titre_page, debut, fin):
+def construire_page(entrees, titre_page):
     par_cat = {code: [] for code, _, _ in CATEGORIES}
     for e in entrees:
         par_cat[classifier(e)].append(e)
@@ -365,27 +378,19 @@ def construire_page(entrees, titre_page, debut, fin):
     aujourdhui = date.today()
     date_fr = "%d %s %d" % (aujourdhui.day, MOIS_FR[aujourdhui.month - 1], aujourdhui.year)
 
-    def dans_periode(e):
-        a = annee_notice(e)
-        return (debut is None or a >= debut) and (fin is None or a <= fin)
-
-    total_periode = sum(1 for e in entrees if dans_periode(e))
-
     nav = []
     sections = []
     for code, ancre, titre_section in CATEGORIES:
-        liste = par_cat[code]
+        liste = par_cat[code]   # ordre chronologique croissant : définit la numérotation
         if not liste:
             continue
-        np = sum(1 for e in liste if dans_periode(e))
-        nav.append('<a href="#%s">%s <small>(%d/%d)</small></a>'
-                   % (ancre, code, np, len(liste)))
-        items = []
-        for i, e in enumerate(liste, start=1):
-            items.append(notice_html(code, i, e, not dans_periode(e)))
-        sections.append('<section id="%s"><h2>%s <small>(%d publications '
-                        'dans la période)</small></h2><ol>%s</ol></section>'
-                        % (ancre, titre_section, np, "".join(items)))
+        nav.append('<a href="#%s">%s <small>(%d)</small></a>'
+                   % (ancre, code, len(liste)))
+        # numérotation attribuée du plus ancien (1) au plus récent, affichage inversé
+        items = [notice_html(code, i, e) for i, e in enumerate(liste, start=1)]
+        items.reverse()
+        sections.append('<section id="%s"><h2>%s <small>(%d)</small></h2><ol>%s</ol></section>'
+                        % (ancre, titre_section, len(liste), "".join(items)))
 
     page = """<!doctype html>
 <html lang="fr">
@@ -407,9 +412,7 @@ def construire_page(entrees, titre_page, debut, fin):
 </body>
 </html>
 """
-    meta = ("%d notices au total, %d dans la période%s."
-            % (len(entrees), total_periode,
-               " %d&ndash;%d" % (debut, fin) if debut else ""))
+    meta = "%d publications et productions." % len(entrees)
     page = (page.replace("@@TITRE@@", html.escape(titre_page))
                 .replace("@@CSS@@", CSS)
                 .replace("@@META@@", meta)
@@ -419,22 +422,45 @@ def construire_page(entrees, titre_page, debut, fin):
     return page
 
 
+def charger_bib(chemin):
+    """Lit le .bib et renvoie une liste de dicts {champ_en_minuscules: texte,
+    "ENTRYTYPE": type, "ID": clé}. Compatible bibtexparser 1.4.1 (version
+    épinglée dans le workflow GitHub) et 2.x (beta)."""
+    if hasattr(bibtexparser, "parse_file"):  # --- bibtexparser 2.x ---
+        base = bibtexparser.parse_file(chemin)
+        sortie = []
+        for ent in base.entries:
+            d = {k.lower(): ("" if f.value is None else str(f.value))
+                 for k, f in ent.fields_dict.items()}
+            d["ENTRYTYPE"] = ent.entry_type.lower()
+            d["ID"] = ent.key
+            sortie.append(d)
+        return sortie
+    # --- bibtexparser 1.x ---
+    from bibtexparser.bparser import BibTexParser
+    parser = BibTexParser(common_strings=True)
+    parser.ignore_nonstandard_types = False   # garder @online, @report, @thesis...
+    parser.homogenize_fields = False
+    with open(chemin, encoding="utf-8") as f:
+        base = bibtexparser.load(f, parser=parser)
+    return base.entries
+
+
 def main():
     p = argparse.ArgumentParser(description="Bibliographie .bib -> page HTML")
     p.add_argument("bib", help="fichier .bib exporté par Better BibLaTeX")
     p.add_argument("-o", "--output", default="index.html", help="fichier HTML de sortie")
-    p.add_argument("--titre", default="Publications", help="titre de la page")
+    p.add_argument("--titre", default="Publications Alain L'Hostis", help="titre de la page")
     p.add_argument("--start-year", type=int, default=None,
-                   help="début de la période (les publications antérieures sont grisées)")
+                   help="(obsolète, ignoré)")
     p.add_argument("--end-year", type=int, default=None,
-                   help="fin de la période")
+                   help="(obsolète, ignoré)")
     args = p.parse_args()
 
-    with open(args.bib, encoding="utf-8") as f:
-        base = bibtexparser.load(f)
-    entrees = [e for e in base.entries if e.get("author") or e.get("editor")]
+    toutes = charger_bib(args.bib)
+    entrees = [e for e in toutes if e.get("author") or e.get("editor")]
 
-    page = construire_page(entrees, args.titre, args.start_year, args.end_year)
+    page = construire_page(entrees, args.titre)
     with open(args.output, "w", encoding="utf-8") as f:
         f.write(page)
     print("OK : %d notices -> %s" % (len(entrees), args.output))
