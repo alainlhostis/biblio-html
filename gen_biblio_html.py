@@ -11,10 +11,12 @@ Reproduit la logique de bibliographie.tex du projet Overleaf :
     et DOI, sous forme de badges cliquables
   * affichage anti-chronologique (le plus recent en premier), la numerotation
     restant celle de l'ordre chronologique croissant (ACL1 = la plus ancienne)
+  * statistiques de visites optionnelles via GoatCounter (sans cookie)
 
 Utilisation :
     pip install "bibtexparser==1.4.1" pylatexenc
-    python gen_biblio_html.py Publications_ALH_BetterBibLaTex.bib -o index.html
+    python gen_biblio_html.py Publications_ALH_BetterBibLaTex.bib -o index.html \
+        --goatcounter alainlhostis
 """
 
 import argparse
@@ -366,7 +368,31 @@ def notice_html(code, numero, e):
             % (code, numero, ref, badges))
 
 
-def construire_page(entrees, titre_page):
+def bloc_goatcounter(code):
+    """Retourne (script_analytics, compteur_pied_de_page) pour GoatCounter.
+    Chaînes vides si aucun code n'est fourni."""
+    code = (code or "").strip()
+    if not code:
+        return "", ""
+    # Le code ne doit contenir que lettres, chiffres et tirets
+    if not re.fullmatch(r"[A-Za-z0-9-]+", code):
+        sys.exit("Code GoatCounter invalide : %r" % code)
+    analytics = ('<script data-goatcounter="https://%s.goatcounter.com/count"\n'
+                 '        async src="//gc.zgo.at/count.js"></script>' % code)
+    compteur = (' <span id="visites"></span>\n'
+                '<script>\n'
+                'fetch("https://%s.goatcounter.com/counter/TOTAL.json")\n'
+                '  .then(function (r) { return r.json(); })\n'
+                '  .then(function (d) {\n'
+                '    document.getElementById("visites").textContent =\n'
+                '      " · " + d.count + " visites";\n'
+                '  })\n'
+                '  .catch(function () {});\n'
+                '</script>' % code)
+    return analytics, compteur
+
+
+def construire_page(entrees, titre_page, goatcounter=""):
     par_cat = {code: [] for code, _, _ in CATEGORIES}
     for e in entrees:
         par_cat[classifier(e)].append(e)
@@ -400,6 +426,7 @@ def construire_page(entrees, titre_page):
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>@@TITRE@@</title>
 <style>@@CSS@@</style>
+@@ANALYTICS@@
 </head>
 <body>
 <header>
@@ -409,17 +436,20 @@ def construire_page(entrees, titre_page):
 <nav>@@NAV@@</nav>
 @@SECTIONS@@
 <footer>Page générée automatiquement à partir du fichier .bib
-(Zotero &ndash; Better BibLaTeX). Dernière mise à jour : @@DATE@@.</footer>
+(Zotero &ndash; Better BibLaTeX). Dernière mise à jour : @@DATE@@.@@COMPTEUR@@</footer>
 </body>
 </html>
 """
     meta = "%d publications et productions." % len(entrees)
+    analytics, compteur = bloc_goatcounter(goatcounter)
     page = (page.replace("@@TITRE@@", html.escape(titre_page))
                 .replace("@@CSS@@", CSS)
                 .replace("@@META@@", meta)
                 .replace("@@NAV@@", "".join(nav))
                 .replace("@@SECTIONS@@", "\n".join(sections))
-                .replace("@@DATE@@", date_fr))
+                .replace("@@DATE@@", date_fr)
+                .replace("@@ANALYTICS@@", analytics)
+                .replace("@@COMPTEUR@@", compteur))
     return page
 
 
@@ -452,6 +482,9 @@ def main():
     p.add_argument("bib", help="fichier .bib exporté par Better BibLaTeX")
     p.add_argument("-o", "--output", default="index.html", help="fichier HTML de sortie")
     p.add_argument("--titre", default="Publications", help="titre de la page")
+    p.add_argument("--goatcounter", default=os.environ.get("GOATCOUNTER_CODE", ""),
+                   help="code de site GoatCounter (ex. alainlhostis) ; "
+                        "vide = pas de statistiques")
     p.add_argument("--start-year", type=int, default=None,
                    help="(obsolète, ignoré)")
     p.add_argument("--end-year", type=int, default=None,
@@ -461,7 +494,7 @@ def main():
     toutes = charger_bib(args.bib)
     entrees = [e for e in toutes if e.get("author") or e.get("editor")]
 
-    page = construire_page(entrees, args.titre)
+    page = construire_page(entrees, args.titre, args.goatcounter)
     dossier = os.path.dirname(args.output)
     if dossier:
         os.makedirs(dossier, exist_ok=True)   # ex. _site/ n'existe pas sur GitHub
